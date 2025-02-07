@@ -2,6 +2,10 @@
 
 A structured logger with Slack integration and AWS Lambda support.
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for a detailed list of changes.
+
 ## Features
 
 - Structured logging with Bunyan
