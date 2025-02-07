@@ -1,17 +1,30 @@
 {
-  "name": "logger",
-  "version": "0.1.0",
-  "description": "",
+  "name": "@heyatlas/logger",
+  "version": "1.0.1",
+  "description": "A structured logger with Slack integration and Lambda support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
+    "test": "jest --passWithNoTests --detectOpenHandles",
     "prepare": "npm run build",
-    "test": "jest --passWithNoTests --detectOpenHandles"
+    "prepublishOnly": "npm test",
+    "clean": "rimraf dist"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "logger",
+    "slack",
+    "lambda",
+    "aws",
+    "typescript"
+  ],
+  "author": "Federico Cano <fedecano@heyatlas.com>",
+  "license": "MIT",
   "devDependencies": {
     "@faker-js/faker": "^9.4.0",
     "@types/bunyan": "^1.8.11",
