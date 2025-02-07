@@ -9,13 +9,7 @@ export interface StreamConfig {
 }
 
 export interface SlackConfig {
-  // for general events
-  webhookUrl: string;
-  // for product events (created, deleted)
-  productWebhookUrl?: string;
-  channel?: string;
-  username?: string;
-  icon_emoji?: string;
+  defaultChannel: string;
   apiToken?: string;
   level: LogLevel;
 }
@@ -26,4 +20,13 @@ export interface LogConfig {
   streams: StreamConfig[];
   logDir?: string;
   slack?: SlackConfig;
+}
+
+export interface Context {
+  slack?: {
+    channel: string;
+    username?: string;
+    icon_emoji?: string;
+  };
+  [key: string]: unknown;
 }
