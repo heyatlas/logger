@@ -71,6 +71,84 @@ export const handler = withLoggerLambda(
 );
 ```
 
+## Environment Configuration
+
+The logger supports different configurations per environment. You can use default configurations or provide your own:
+
+### Default Configurations
+
+The logger comes with default configurations for common environments:
+
+```typescript
+const defaultConfigs = {
+  test: {
+    streams: [{ level: "fatal", type: "stdout" }],
+  },
+  local: {
+    streams: [{ level: "info", type: "stdout" }],
+  },
+  staging: {
+    streams: [{ level: "info", type: "stdout" }],
+    slack: {
+      defaultChannel: "#staging-logs",
+      level: "warn",
+    },
+  },
+  production: {
+    streams: [{ level: "info", type: "stdout" }],
+    slack: {
+      defaultChannel: "#prod-alerts",
+      level: "warn",
+    },
+  },
+};
+```
+
+### Custom Environment Configurations
+
+You can provide your own environment configurations:
+
+```typescript
+import { getLogger, EnvironmentConfigs } from "@heyatlas/logger";
+import { AsyncLocalStorage } from "async_hooks";
+
+const customEnvConfigs: EnvironmentConfigs = {
+  development: {
+    streams: [{ level: "debug", type: "stdout" }],
+  },
+  qa: {
+    streams: [
+      { level: "info", type: "stdout" },
+      { level: "error", type: "file", path: "/var/log/app.log" },
+    ],
+    slack: {
+      defaultChannel: "#qa-alerts",
+      level: "error",
+    },
+  },
+};
+
+const executionContext = new AsyncLocalStorage();
+
+const logger = getLogger(
+  executionContext,
+  {
+    name: "my-service",
+    env: "qa",
+    slack: {
+      apiToken: process.env.SLACK_TOKEN,
+    },
+  },
+  customEnvConfigs
+);
+```
+
+Each environment configuration can specify:
+
+- Stream configurations (stdout, file)
+- Slack integration settings
+- Log levels per stream and Slack
+
 ## API Documentation
 
 ### Log Levels

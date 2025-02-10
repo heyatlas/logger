@@ -30,3 +30,7 @@ export interface Context {
   };
   [key: string]: unknown;
 }
+
+export interface EnvironmentConfigs {
+  [environment: string]: Omit<LogConfig, "name" | "env">;
+}

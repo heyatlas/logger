@@ -5,7 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.1] - 2025-02-07
+## [1.1.0] - 2024-02-10
+
+### Added
+
+- Custom environment configurations support through `envConfigs` parameter
+- Default configurations for test, local, staging, and production environments
+- Type definitions for environment configurations
+
+### Changed
+
+- `getLogger` function now accepts optional environment configurations
+
+## [1.0.1] - 2024-02-07
 
 - Add `withLoggerLambda` wrapper for Lambda handlers
 - Add `getLogger` function to get the logger from the execution context
