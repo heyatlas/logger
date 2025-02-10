@@ -71,6 +71,52 @@ export const handler = withLoggerLambda(
 );
 ```
 
+### Environment-based Configuration
+
+You can configure the logger differently for each environment:
+
+```typescript
+import { Logger, EnvironmentConfigs } from "@heyatlas/logger";
+
+// Custom environment configurations
+const customEnvConfigs: EnvironmentConfigs = {
+  development: {
+    streams: [{ level: "debug", type: "stdout" }],
+  },
+  qa: {
+    streams: [
+      { level: "info", type: "stdout" },
+      { level: "error", type: "file", path: "/var/log/app.log" },
+    ],
+    slack: {
+      defaultChannel: "#qa-alerts",
+      level: "error",
+    },
+  },
+};
+
+// Use with custom environment configs
+const logger = new Logger(
+  {
+    name: "my-service",
+    env: "qa",
+    slack: {
+      apiToken: process.env.SLACK_TOKEN,
+    },
+  },
+  customEnvConfigs
+);
+
+// Or use default configurations
+const logger = new Logger({
+  name: "my-service",
+  env: "production",
+  slack: {
+    apiToken: process.env.SLACK_TOKEN,
+  },
+});
+```
+
 ## Environment Configuration
 
 The logger supports different configurations per environment. You can use default configurations or provide your own:

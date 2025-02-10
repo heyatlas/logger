@@ -2,7 +2,31 @@ import bunyan from "bunyan";
 import { omit } from "lodash";
 import pino from "pino-pretty";
 import { SlackLogger } from "./slackLogger";
-import { Context, LogConfig, LogLevel } from "./types";
+import { Context, LogConfig, LogLevel, EnvironmentConfigs } from "./types";
+
+// Default environment configurations
+const DEFAULT_ENV_CONFIGS: EnvironmentConfigs = {
+  test: {
+    streams: [{ level: "fatal", type: "stdout" }],
+  },
+  local: {
+    streams: [{ level: "info", type: "stdout" }],
+  },
+  staging: {
+    streams: [{ level: "info", type: "stdout" }],
+    slack: {
+      defaultChannel: "#staging-logs",
+      level: "warn",
+    },
+  },
+  production: {
+    streams: [{ level: "info", type: "stdout" }],
+    slack: {
+      defaultChannel: "#prod-alerts",
+      level: "warn",
+    },
+  },
+};
 
 // pretty stream for local development
 const prettyStream = pino({
@@ -16,20 +40,39 @@ export class Logger {
   private context: Record<string, unknown> = {};
   public slackLogger?: SlackLogger;
 
-  constructor(config: LogConfig, env?: string) {
-    this.logger = this.createLogger(config, env);
-    if (config.slack) {
-      this.slackLogger = new SlackLogger(config.slack);
+  constructor(
+    config: LogConfig,
+    envConfigs: EnvironmentConfigs = DEFAULT_ENV_CONFIGS
+  ) {
+    const environment = config.env || "local";
+    const envConfig = envConfigs[environment];
+
+    if (!envConfig) {
+      throw new Error(`Unknown environment: ${environment}`);
+    }
+
+    const finalConfig = {
+      ...envConfig,
+      ...config,
+      // Merge streams if both exist
+      streams: config.streams || envConfig.streams,
+      // Merge slack config if both exist
+      slack: config.slack || envConfig.slack,
+    };
+
+    this.logger = this.createLogger(finalConfig);
+    if (finalConfig.slack) {
+      this.slackLogger = new SlackLogger(finalConfig.slack);
     }
   }
 
-  private createLogger(config: LogConfig, env?: string): bunyan {
+  private createLogger(config: LogConfig): bunyan {
     const streams: bunyan.Stream[] = config.streams.map((streamConfig) => {
       switch (streamConfig.type) {
         case "stdout":
           return {
             level: streamConfig.level,
-            stream: env === "test" ? prettyStream : process.stdout,
+            stream: config.env === "test" ? prettyStream : process.stdout,
           };
         case "file":
           if (!streamConfig.path) {
