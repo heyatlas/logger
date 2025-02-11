@@ -28,11 +28,13 @@ npm install @heyatlas/logger
 ```typescript
 import { Logger } from "@heyatlas/logger";
 
+// Only name is required at root level
 const logger = new Logger({
   name: "my-app",
-  streams: [{ type: "stdout", level: "info" }],
 });
 
+// Environment is determined by process.env.NODE_ENV
+// Defaults to "local" if not set
 logger.info("Hello world", { userId: "123" });
 ```
 
@@ -42,12 +44,23 @@ logger.info("Hello world", { userId: "123" });
 const logger = new Logger({
   name: "my-app",
   streams: [{ type: "stdout", level: "info" }],
-  slack: {
-    apiToken: "your-slack-token",
-    defaultChannel: "#logs",
-    level: "error",
+  slackApiToken: "your-slack-token",
+  staging: {
+    streams: [{ type: "stdout", level: "info" }],
+    slack: {
+      defaultChannel: "#staging-logs",
+      level: "warn",
+    },
+  },
+  production: {
+    streams: [{ type: "stdout", level: "info" }],
+    slack: {
+      defaultChannel: "#production-logs",
+      level: "error",
+    },
   },
 });
+
 logger.error("Something went wrong", {
   slack: { channel: "#alerts" },
   error: new Error("Details here"),
@@ -73,49 +86,53 @@ export const handler = withLoggerLambda(
 
 ### Environment-based Configuration
 
-You can configure the logger differently for each environment:
+The logger uses NODE_ENV to determine which environment configuration to use:
 
 ```typescript
-import { Logger, EnvironmentConfigs } from "@heyatlas/logger";
+import { Logger } from "@heyatlas/logger";
 
-// Custom environment configurations
-const customEnvConfigs: EnvironmentConfigs = {
-  development: {
+const logger = new Logger({
+  name: "my-service",
+  slackApiToken: process.env.SLACK_TOKEN, // Optional: enable Slack integration
+
+  // Environment-specific configurations
+  local: {
     streams: [{ level: "debug", type: "stdout" }],
   },
-  qa: {
-    streams: [
-      { level: "info", type: "stdout" },
-      { level: "error", type: "file", path: "/var/log/app.log" },
-    ],
+  test: {
+    streams: [{ level: "fatal", type: "stdout" }],
+  },
+  staging: {
+    streams: [{ level: "info", type: "stdout" }],
     slack: {
-      defaultChannel: "#qa-alerts",
+      defaultChannel: "#staging-logs",
+      level: "warn",
+    },
+  },
+  production: {
+    streams: [{ level: "info", type: "stdout" }],
+    slack: {
+      defaultChannel: "#prod-alerts",
       level: "error",
     },
   },
-};
-
-// Use with custom environment configs
-const logger = new Logger(
-  {
-    name: "my-service",
-    env: "qa",
-    slack: {
-      apiToken: process.env.SLACK_TOKEN,
-    },
-  },
-  customEnvConfigs
-);
-
-// Or use default configurations
-const logger = new Logger({
-  name: "my-service",
-  env: "production",
-  slack: {
-    apiToken: process.env.SLACK_TOKEN,
-  },
 });
 ```
+
+### Configuration Structure
+
+The logger uses two levels of configuration:
+
+1. Root Configuration:
+
+   - `name` (required): Logger name
+   - `slackApiToken` (optional): Slack API token for integration
+
+2. Environment Configuration:
+   - `streams` (required): Array of stream configurations
+   - `slack` (optional): Slack settings per environment
+     - `defaultChannel`: Default Slack channel
+     - `level`: Minimum level for Slack notifications
 
 ## Environment Configuration
 
@@ -180,9 +197,9 @@ const logger = getLogger(
   executionContext,
   {
     name: "my-service",
-    env: "qa",
-    slack: {
-      apiToken: process.env.SLACK_TOKEN,
+    slackApiToken: process.env.SLACK_TOKEN,
+    qa: {
+      streams: [{ level: "debug", type: "stdout" }],
     },
   },
   customEnvConfigs
