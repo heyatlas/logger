@@ -1,5 +1,14 @@
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
 
+export enum LogLevelEnum {
+  TRACE = "trace",
+  DEBUG = "debug",
+  INFO = "info",
+  WARN = "warn",
+  ERROR = "error",
+  FATAL = "fatal",
+}
+
 export interface StreamConfig {
   level: LogLevel;
   type: "stdout" | "file";
