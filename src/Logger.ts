@@ -1,8 +1,15 @@
 import bunyan from "bunyan";
-import { omit } from "lodash";
+import { merge, omit } from "lodash";
 import pino from "pino-pretty";
 import { SlackLogger } from "./slackLogger";
-import { Context, LogConfig, LogLevel, EnvironmentConfigs } from "./types";
+import {
+  Context,
+  EnvironmentConfig,
+  EnvironmentConfigs,
+  LogConfig,
+  LogLevel,
+  StreamConfig,
+} from "./types";
 
 // Default environment configurations
 const DEFAULT_ENV_CONFIGS: EnvironmentConfigs = {
@@ -40,39 +47,44 @@ export class Logger {
   private context: Record<string, unknown> = {};
   public slackLogger?: SlackLogger;
 
-  constructor(
-    config: LogConfig,
-    envConfigs: EnvironmentConfigs = DEFAULT_ENV_CONFIGS
-  ) {
-    const environment = config.env || "local";
-    const envConfig = envConfigs[environment];
+  constructor(config: LogConfig) {
+    const environment = process.env.NODE_ENV || "local";
+    const defaultEnvConfig = DEFAULT_ENV_CONFIGS[environment];
+    const envConfig = config[environment] as EnvironmentConfig;
 
-    if (!envConfig) {
-      throw new Error(`Unknown environment: ${environment}`);
+    if (!envConfig && !defaultEnvConfig) {
+      throw new Error(
+        `Invalid or missing configuration for environment: ${environment}`
+      );
     }
 
-    const finalConfig = {
-      ...envConfig,
-      ...config,
-      // Merge streams if both exist
-      streams: config.streams || envConfig.streams,
-      // Merge slack config if both exist
-      slack: config.slack || envConfig.slack,
-    };
+    // Merge default environment config with user-provided config
+    const finalEnvConfig = merge({}, defaultEnvConfig, envConfig);
 
-    this.logger = this.createLogger(finalConfig);
-    if (finalConfig.slack) {
-      this.slackLogger = new SlackLogger(finalConfig.slack);
+    this.logger = this.createLogger({
+      name: config.name,
+      streams: finalEnvConfig.streams,
+    });
+
+    if (config.slackApiToken && finalEnvConfig.slack) {
+      this.slackLogger = new SlackLogger({
+        apiToken: config.slackApiToken,
+        ...finalEnvConfig.slack,
+      });
     }
   }
 
-  private createLogger(config: LogConfig): bunyan {
+  private createLogger(config: {
+    name: string;
+    streams: StreamConfig[];
+  }): bunyan {
     const streams: bunyan.Stream[] = config.streams.map((streamConfig) => {
       switch (streamConfig.type) {
         case "stdout":
           return {
             level: streamConfig.level,
-            stream: config.env === "test" ? prettyStream : process.stdout,
+            stream:
+              process.env.NODE_ENV === "test" ? prettyStream : process.stdout,
           };
         case "file":
           if (!streamConfig.path) {
