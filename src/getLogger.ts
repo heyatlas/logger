@@ -1,65 +1,24 @@
 import { AsyncLocalStorage } from "async_hooks";
-import { merge } from "lodash";
+import { merge, omit } from "lodash";
 import { Logger } from "./Logger";
-import { LogConfig, EnvironmentConfigs } from "./types";
-
-const DEFAULT_CONFIGS: EnvironmentConfigs = {
-  test: {
-    streams: [{ level: "fatal", type: "stdout" }],
-  },
-  local: {
-    streams: [{ level: "info", type: "stdout" }],
-  },
-  localhost: {
-    streams: [{ level: "info", type: "stdout" }],
-  },
-  staging: {
-    streams: [{ level: "info", type: "stdout" }],
-    slack: {
-      defaultChannel: "#staging-logs",
-      level: "warn",
-    },
-  },
-  production: {
-    streams: [{ level: "info", type: "stdout" }],
-    slack: {
-      defaultChannel: "#prod-alerts",
-      level: "warn",
-    },
-  },
-};
-
-function createLogger(
-  environment: string,
-  projectName: string,
-  options?: Partial<LogConfig>,
-  envConfigs: EnvironmentConfigs = DEFAULT_CONFIGS
-): Logger {
-  const envConfig = envConfigs[environment];
-  if (!envConfig) {
-    throw new Error(`Unknown environment: ${environment}`);
-  }
-
-  const baseConfig: LogConfig = {
-    name: projectName,
-    ...envConfig,
-  };
-
-  return new Logger(merge({}, baseConfig, options ?? {}));
-}
+import { LogConfig } from "./types";
 
 export function getLogger(
   context: AsyncLocalStorage<{ logger?: Logger }>,
-  options?: Partial<LogConfig>,
-  envConfigs?: EnvironmentConfigs
+  options?: Partial<LogConfig>
 ): Logger {
   let logger = context.getStore()?.logger;
   if (!logger) {
-    logger = createLogger(
-      options?.env ?? "localhost",
-      options?.name ?? "unknown-api",
-      options,
-      envConfigs
+    const config: LogConfig = {
+      name: options?.name ?? "unknown-api",
+      slackApiToken: options?.slackApiToken,
+      [process.env.NODE_ENV || "local"]: {
+        streams: [{ level: "info", type: "stdout" }],
+      },
+    };
+
+    logger = new Logger(
+      merge({}, config, omit(options, ["name", "slackApiToken"]))
     );
     context.enterWith({ logger });
   }
