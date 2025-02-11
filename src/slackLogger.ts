@@ -2,15 +2,6 @@ import { WebClient } from "@slack/web-api";
 import { isLevelEnabled } from "./isLevelEnabled";
 import { Context, LogLevel, SlackConfig } from "./types";
 
-export enum LogLevelEnum {
-  TRACE = "trace",
-  DEBUG = "debug",
-  INFO = "info",
-  WARN = "warn",
-  ERROR = "error",
-  FATAL = "fatal",
-}
-
 export const COLOR_FROM_LEVEL: Record<LogLevel, string> = {
   trace: "#c4c4c4",
   debug: "#00ab00",
@@ -29,7 +20,7 @@ export const EMOJI_FROM_LEVEL: Record<LogLevel, string> = {
   fatal: ":scream:", // 😱
 };
 
-interface SlackLoggerConfig extends SlackConfig {
+export interface SlackLoggerConfig extends SlackConfig {
   apiToken: string;
 }
 
@@ -57,25 +48,28 @@ export class SlackLogger {
     message: string,
     extra?: Context
   ): Promise<void> {
-    if (isLevelEnabled(level, this.config.level) && extra?.slack?.channel) {
-      const slackMessage = {
-        text: `*${level.toUpperCase()}:* ${message}`,
-        channel: extra.slack.channel,
-        username: extra.slack.username || "AtlasLogger",
-        icon_emoji: extra.slack.icon_emoji || ":warning:",
-        attachments: extra
-          ? [
-              {
-                fields: this.formatExtra(extra),
-                color: COLOR_FROM_LEVEL[level],
-              },
-            ]
-          : undefined,
-      };
-      try {
-        await this.client.chat.postMessage(slackMessage);
-      } catch (error) {
-        console.error("Error sending slack message:", error);
+    if (isLevelEnabled(level, this.config.level)) {
+      const channel = extra?.slack?.channel || this.config.defaultChannel;
+      if (channel) {
+        const slackMessage = {
+          text: `*${level.toUpperCase()}:* ${message}`,
+          channel,
+          username: extra?.slack?.username || "AtlasLogger",
+          icon_emoji: extra?.slack?.icon_emoji || ":warning:",
+          attachments: extra
+            ? [
+                {
+                  fields: this.formatExtra(extra),
+                  color: COLOR_FROM_LEVEL[level],
+                },
+              ]
+            : undefined,
+        };
+        try {
+          await this.client.chat.postMessage(slackMessage);
+        } catch (error) {
+          console.error("Error sending slack message:", error);
+        }
       }
     }
   }
