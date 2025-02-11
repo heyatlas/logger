@@ -1,35 +1,98 @@
 import { WebClient } from "@slack/web-api";
-import { COLOR_FROM_LEVEL, LogLevelEnum, SlackLogger } from "./slackLogger";
-import { Context, SlackConfig } from "./types";
 import { isLevelEnabled } from "./isLevelEnabled";
+import {
+  COLOR_FROM_LEVEL,
+  SlackLogger,
+  SlackLoggerConfig,
+} from "./slackLogger";
+import { LogLevelEnum } from "./types";
 
-// Mock the WebClient class
+// Mock WebClient
 jest.mock("@slack/web-api");
 
 describe("SlackLogger", () => {
   let slackLogger: SlackLogger;
   let mockPostMessage: jest.Mock;
 
-  const config: SlackConfig = {
+  const config: SlackLoggerConfig = {
     apiToken: "test-token",
+    defaultChannel: "#test-channel",
     level: LogLevelEnum.INFO,
-    defaultChannel: "#default-channel",
   };
 
   beforeEach(() => {
-    // Clear all mocks before each test
+    // Reset mocks
     jest.clearAllMocks();
 
-    // Create a mock for the postMessage method
-    mockPostMessage = jest.fn();
+    // Setup WebClient mock
+    mockPostMessage = jest.fn().mockResolvedValue({ ok: true });
     (WebClient as unknown as jest.Mock).mockImplementation(() => ({
       chat: {
         postMessage: mockPostMessage,
       },
     }));
 
-    // Create a new SlackLogger instance before each test
+    // Create SlackLogger instance
     slackLogger = new SlackLogger(config);
+  });
+
+  describe("send", () => {
+    it("should send message to Slack", async () => {
+      // Arrange
+      const message = "Test message";
+      const level = LogLevelEnum.INFO; // This matches config.level
+      const context = { requestId: "123" };
+
+      // Act
+      await slackLogger.send(level, message, context);
+
+      // Assert
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: config.defaultChannel,
+          text: expect.stringContaining(message),
+          username: "AtlasLogger",
+          icon_emoji: ":warning:",
+          attachments: expect.arrayContaining([
+            expect.objectContaining({
+              fields: expect.arrayContaining([
+                expect.objectContaining({ value: context.requestId }),
+              ]),
+            }),
+          ]),
+        })
+      );
+    });
+
+    it("should use custom channel from context", async () => {
+      // Arrange
+      const customChannel = "#custom-channel";
+      const message = "Test message";
+      const level = LogLevelEnum.INFO;
+      const context = { slack: { channel: customChannel } };
+
+      // Act
+      await slackLogger.send(level, message, context);
+
+      // Assert
+      expect(mockPostMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: customChannel,
+        })
+      );
+    });
+
+    it("should not send message if level is below configured level", async () => {
+      // Arrange
+      const message = "Debug message";
+      const level = LogLevelEnum.DEBUG;
+
+      // Act
+      await slackLogger.send(level, message);
+
+      // Assert
+      expect(mockPostMessage).not.toHaveBeenCalled();
+    });
   });
 
   describe.each([
@@ -50,7 +113,7 @@ describe("SlackLogger", () => {
       const message = "Test message";
       const channel = "#test-channel";
 
-      const context: Context = {
+      const context = {
         userId: "123",
         requestId: "456",
         slack: {
@@ -99,13 +162,20 @@ describe("SlackLogger", () => {
 
     it("should not send message when slack channel is not provided", async () => {
       // Arrange
+      const configWithoutDefaultChannel: SlackLoggerConfig = {
+        apiToken: "test-token",
+        level: LogLevelEnum.INFO,
+        defaultChannel: "", // Empty default channel
+      };
+      const localSlackLogger = new SlackLogger(configWithoutDefaultChannel);
+
       const message = "Test message";
-      const context: Context = {
+      const context = {
         userId: "123",
       };
 
       // Act
-      await slackLogger.send(level, message, context);
+      await localSlackLogger.send(level, message, context);
 
       // Assert
       expect(mockPostMessage).not.toHaveBeenCalled();
@@ -120,7 +190,7 @@ describe("SlackLogger", () => {
       // Arrange
       mockPostMessage.mockRejectedValue(new Error("Slack API Error"));
       const message = "Test message";
-      const context: Context = {
+      const context = {
         slack: {
           channel: "#test-channel",
         },
