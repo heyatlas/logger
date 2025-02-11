@@ -5,17 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-02-11
+
+### Added
+
+- Environment configuration support in Logger constructor
+- Default environment configurations for test, local, staging, and production
+- Simplified Slack configuration with single API token at root level
+
+### Changed
+
+- Logger constructor now accepts simplified root configuration
+- Streams configuration moved to environment-specific configs
+- Slack configuration split between root (API token) and environment (channel, level)
+- Improved configuration merging
+
 ## [1.2.0] - 2025-02-10
 
 ### Added
 
 - Environment configuration support in Logger constructor
 - Default environment configurations for test, local, staging, and production
-- Ability to override default configurations per environment
-
-### Changed
-
-- Logger constructor now accepts optional environment configurations
 
 ## [1.1.0] - 2025-02-10
 
