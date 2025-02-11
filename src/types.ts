@@ -19,11 +19,15 @@ export interface EnvironmentConfig {
   slack?: SlackConfig;
 }
 
+// Configuration for environments
+export interface EnvironmentConfigs {
+  [environment: string]: EnvironmentConfig | string | undefined;
+}
+
 // Main logger configuration
-export interface LogConfig {
+export interface LogConfig extends EnvironmentConfigs {
   name: string;
   slackApiToken?: string;
-  [environment: string]: EnvironmentConfig | string | undefined;
 }
 
 export interface Context {

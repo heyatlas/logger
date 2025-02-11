@@ -29,11 +29,15 @@ export const EMOJI_FROM_LEVEL: Record<LogLevel, string> = {
   fatal: ":scream:", // 😱
 };
 
+interface SlackLoggerConfig extends SlackConfig {
+  apiToken: string;
+}
+
 export class SlackLogger {
-  private config: SlackConfig;
+  private config: SlackLoggerConfig;
   private client: WebClient;
 
-  constructor(config: SlackConfig) {
+  constructor(config: SlackLoggerConfig) {
     this.config = config;
     this.client = new WebClient(this.config.apiToken);
   }
