@@ -43,7 +43,6 @@ logger.info("Hello world", { userId: "123" });
 ```typescript
 const logger = new Logger({
   name: "my-app",
-  streams: [{ type: "stdout", level: "info" }],
   slackApiToken: "your-slack-token",
   staging: {
     streams: [{ type: "stdout", level: "info" }],
