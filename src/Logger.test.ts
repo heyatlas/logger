@@ -1,7 +1,7 @@
 import bunyan from "bunyan";
 import { Logger } from "./Logger";
-import { LogLevelEnum, SlackLogger } from "./slackLogger";
-import { Context, LogConfig } from "./types";
+import { SlackLogger } from "./slackLogger";
+import { Context, LogConfig, LogLevelEnum } from "./types";
 
 // Mock dependencies
 jest.mock("bunyan");
