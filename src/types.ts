@@ -5,21 +5,25 @@ export interface StreamConfig {
   type: "stdout" | "file";
   path?: string;
   stream?: NodeJS.WritableStream;
-  localPath?: string;
 }
 
+// Environment level Slack config
 export interface SlackConfig {
-  defaultChannel: string;
-  apiToken?: string;
   level: LogLevel;
+  defaultChannel: string;
 }
 
-export interface LogConfig {
-  env?: string;
-  name: string;
+// Configuration for each environment
+export interface EnvironmentConfig {
   streams: StreamConfig[];
-  logDir?: string;
   slack?: SlackConfig;
+}
+
+// Main logger configuration
+export interface LogConfig {
+  name: string;
+  slackApiToken?: string;
+  [environment: string]: EnvironmentConfig | string | undefined;
 }
 
 export interface Context {
@@ -29,8 +33,4 @@ export interface Context {
     icon_emoji?: string;
   };
   [key: string]: unknown;
-}
-
-export interface EnvironmentConfigs {
-  [environment: string]: Omit<LogConfig, "name" | "env">;
 }
