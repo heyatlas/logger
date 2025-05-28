@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-05-28
+
+### Added
+
+- New logger factory with context management support
+- Improved AsyncLocalStorage integration
+- Better separation of concerns between logger and context management
+
+### Changed
+
+- Refactored logger creation to use factory pattern
+- Improved Lambda wrapper to work with new logger factory
+- Better type safety and error handling
+
 ## [1.3.1] - 2025-02-11
 
 ### Changed

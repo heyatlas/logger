@@ -14,6 +14,7 @@ See [CHANGELOG.md](./CHANGELOG.md) for a detailed list of changes.
 - TypeScript support
 - Log level management
 - Async context tracking
+- Context management with AsyncLocalStorage
 
 ## Installation
 
@@ -36,6 +37,157 @@ const logger = new Logger({
 // Environment is determined by process.env.NODE_ENV
 // Defaults to "local" if not set
 logger.info("Hello world", { userId: "123" });
+```
+
+### Usage Scenarios
+
+#### 1. AWS Lambda Functions
+
+```typescript
+import { AsyncLocalStorage } from "async_hooks";
+import { createLogger, withLoggerLambda } from "@heyatlas/logger";
+
+// Create execution context
+const executionContext = new AsyncLocalStorage();
+
+// Create logger factory
+const { logger, getLogger } = createLogger(executionContext, {
+  name: "my-lambda-service",
+  slackApiToken: process.env.SLACK_TOKEN,
+  production: {
+    streams: [{ level: "info", type: "stdout" }],
+    slack: {
+      defaultChannel: "#prod-alerts",
+      level: "error",
+    },
+  },
+});
+
+// Export getLogger for use in other modules
+export { getLogger };
+
+// Lambda handler
+export const handler = withLoggerLambda(
+  executionContext,
+  async (event, context) => {
+    const logger = getLogger();
+
+    logger.info("Processing event", { event });
+
+    try {
+      // Your handler logic here
+      const result = await processEvent(event);
+      logger.info("Event processed successfully", { result });
+      return result;
+    } catch (error) {
+      logger.error("Failed to process event", { error });
+      throw error;
+    }
+  }
+);
+```
+
+#### 2. EC2/ECS API Service (Express)
+
+```typescript
+import express from "express";
+import { AsyncLocalStorage } from "async_hooks";
+import { createLogger } from "@heyatlas/logger";
+
+const app = express();
+const executionContext = new AsyncLocalStorage();
+
+// Create logger factory
+const { logger, getLogger } = createLogger(executionContext, {
+  name: "my-api-service",
+  slackApiToken: process.env.SLACK_TOKEN,
+  production: {
+    streams: [{ level: "info", type: "stdout" }],
+    slack: {
+      defaultChannel: "#prod-alerts",
+      level: "error",
+    },
+  },
+});
+
+// Export getLogger for use in other modules
+export { getLogger };
+
+// Middleware to create context for each request
+app.use((req, res, next) => {
+  executionContext.run({ logger }, () => next());
+});
+
+// Example route
+app.get("/users/:id", async (req, res) => {
+  const logger = getLogger();
+
+  try {
+    logger.info("Fetching user", { userId: req.params.id });
+    const user = await userService.getUser(req.params.id);
+    logger.info("User fetched successfully", { user });
+    res.json(user);
+  } catch (error) {
+    logger.error("Failed to fetch user", { error });
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+```
+
+#### 3. GraphQL Service
+
+```typescript
+import { ApolloServer } from "apollo-server";
+import { AsyncLocalStorage } from "async_hooks";
+import { createLogger } from "@heyatlas/logger";
+
+const executionContext = new AsyncLocalStorage();
+
+// Create logger factory
+const { logger, getLogger } = createLogger(executionContext, {
+  name: "my-graphql-service",
+  slackApiToken: process.env.SLACK_TOKEN,
+  production: {
+    streams: [{ level: "info", type: "stdout" }],
+    slack: {
+      defaultChannel: "#prod-alerts",
+      level: "error",
+    },
+  },
+});
+
+// Export getLogger for use in other modules
+export { getLogger };
+
+// Apollo Server context
+const context = async ({ req }) => {
+  return executionContext.run({ logger }, () => ({ req }));
+};
+
+// Example resolver
+const resolvers = {
+  Query: {
+    user: async (_, { id }, context) => {
+      const logger = getLogger();
+
+      try {
+        logger.info("Fetching user", { userId: id });
+        const user = await userService.getUser(id);
+        logger.info("User fetched successfully", { user });
+        return user;
+      } catch (error) {
+        logger.error("Failed to fetch user", { error });
+        throw error;
+      }
+    },
+  },
+};
+
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+  context,
+});
 ```
 
 ### Slack Integration
@@ -64,23 +216,6 @@ logger.error("Something went wrong", {
   slack: { channel: "#alerts" },
   error: new Error("Details here"),
 });
-```
-
-### AWS Lambda Support
-
-```typescript
-import { withLoggerLambda } from "@heyatlas/logger";
-import { AsyncLocalStorage } from "async_hooks";
-
-const executionContext = new AsyncLocalStorage();
-export const handler = withLoggerLambda(
-  executionContext,
-  async (event, context) => {
-    const logger = getLogger(executionContext);
-    logger.info("Processing event", { event });
-    // ... handler logic
-  }
-);
 ```
 
 ### Environment-based Configuration
@@ -132,84 +267,6 @@ The logger uses two levels of configuration:
    - `slack` (optional): Slack settings per environment
      - `defaultChannel`: Default Slack channel
      - `level`: Minimum level for Slack notifications
-
-## Environment Configuration
-
-The logger supports different configurations per environment. You can use default configurations or provide your own:
-
-### Default Configurations
-
-The logger comes with default configurations for common environments:
-
-```typescript
-const defaultConfigs = {
-  test: {
-    streams: [{ level: "fatal", type: "stdout" }],
-  },
-  local: {
-    streams: [{ level: "info", type: "stdout" }],
-  },
-  staging: {
-    streams: [{ level: "info", type: "stdout" }],
-    slack: {
-      defaultChannel: "#staging-logs",
-      level: "warn",
-    },
-  },
-  production: {
-    streams: [{ level: "info", type: "stdout" }],
-    slack: {
-      defaultChannel: "#prod-alerts",
-      level: "warn",
-    },
-  },
-};
-```
-
-### Custom Environment Configurations
-
-You can provide your own environment configurations:
-
-```typescript
-import { getLogger, EnvironmentConfigs } from "@heyatlas/logger";
-import { AsyncLocalStorage } from "async_hooks";
-
-const customEnvConfigs: EnvironmentConfigs = {
-  development: {
-    streams: [{ level: "debug", type: "stdout" }],
-  },
-  qa: {
-    streams: [
-      { level: "info", type: "stdout" },
-      { level: "error", type: "file", path: "/var/log/app.log" },
-    ],
-    slack: {
-      defaultChannel: "#qa-alerts",
-      level: "error",
-    },
-  },
-};
-
-const executionContext = new AsyncLocalStorage();
-
-const logger = getLogger(
-  executionContext,
-  {
-    name: "my-service",
-    slackApiToken: process.env.SLACK_TOKEN,
-    qa: {
-      streams: [{ level: "debug", type: "stdout" }],
-    },
-  },
-  customEnvConfigs
-);
-```
-
-Each environment configuration can specify:
-
-- Stream configurations (stdout, file)
-- Slack integration settings
-- Log levels per stream and Slack
 
 ## API Documentation
 
