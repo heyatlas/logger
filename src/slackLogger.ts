@@ -73,4 +73,8 @@ export class SlackLogger {
       }
     }
   }
+
+  public getConfig(): SlackLoggerConfig {
+    return this.config;
+  }
 }

@@ -154,4 +154,23 @@ export class Logger {
   public fatal(message: string, extra?: Context): void {
     this.log("fatal", message, extra);
   }
+
+  public child(boundFields: Context): Logger {
+    const childLogger = new Logger({
+      name: this.logger.fields.name,
+      slackApiToken: this.slackLogger?.getConfig().apiToken,
+      [process.env.NODE_ENV || "local"]: {
+        streams: (this.logger as any)._streams.map(
+          (stream: { level: number; type: string; path?: string }) => ({
+            level: stream.level,
+            type: stream.type,
+            path: stream.path,
+          })
+        ),
+      },
+    });
+    childLogger.logger = this.logger.child(boundFields);
+    childLogger.context = { ...this.context, ...boundFields };
+    return childLogger;
+  }
 }

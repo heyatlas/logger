@@ -2,6 +2,8 @@ import bunyan from "bunyan";
 import { Logger } from "./Logger";
 import { SlackLogger } from "./slackLogger";
 import { Context, LogConfig, LogLevelEnum } from "./types";
+import { AsyncLocalStorage } from "async_hooks";
+import { LoggerContext } from "./loggerFactory";
 
 // Mock dependencies
 jest.mock("bunyan");
@@ -46,6 +48,18 @@ describe("Logger", () => {
       warn: jest.fn(),
       error: jest.fn(),
       fatal: jest.fn(),
+      child: jest.fn().mockReturnValue({
+        trace: jest.fn(),
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        fatal: jest.fn(),
+        fields: { name: "test-logger" },
+        _streams: [{ level: "fatal", type: "stdout" }],
+      }),
+      fields: { name: "test-logger" },
+      _streams: [{ level: "fatal", type: "stdout" }],
     });
     (bunyan.createLogger as jest.Mock) = mockBunyanLogger;
 
@@ -53,6 +67,7 @@ describe("Logger", () => {
     mockSlackSend = jest.fn().mockResolvedValue(undefined);
     (SlackLogger as jest.Mock).mockImplementation(() => ({
       send: mockSlackSend,
+      getConfig: () => ({ apiToken: "test-token" }),
     }));
 
     consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
@@ -229,6 +244,158 @@ describe("Logger", () => {
           ]),
         })
       );
+    });
+  });
+
+  describe("child logger", () => {
+    it("should create a child logger using Bunyan's child method", () => {
+      // Arrange
+      const logger = new Logger(defaultConfig);
+      const boundFields = { component: "auth", userId: "123" };
+      const mockChildLogger = {
+        trace: jest.fn(),
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        fatal: jest.fn(),
+        fields: { name: "test-logger" },
+        _streams: [{ level: "fatal", type: "stdout" }],
+      };
+      logger["logger"].child = jest
+        .fn()
+        .mockImplementation(() => mockChildLogger);
+
+      // Act
+      const childLogger = logger.child(boundFields);
+
+      // Assert
+      expect(logger["logger"].child).toHaveBeenCalledWith(boundFields);
+      expect(childLogger["logger"]).toBe(mockChildLogger);
+    });
+
+    it("should inherit parent's context but override with bound fields", () => {
+      // Arrange
+      const logger = new Logger(defaultConfig);
+      logger.setContext("userId", "456");
+      logger.setContext("requestId", "789");
+      const boundFields = { userId: "123" };
+      const mockChildLogger = {
+        trace: jest.fn(),
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        fatal: jest.fn(),
+        fields: { name: "test-logger" },
+        _streams: [{ level: "fatal", type: "stdout" }],
+      };
+      logger["logger"].child = jest
+        .fn()
+        .mockImplementation(() => mockChildLogger);
+
+      // Act
+      const childLogger = logger.child(boundFields);
+      childLogger.info("test message");
+
+      // Assert
+      expect(childLogger["logger"].info).toHaveBeenCalledWith(
+        { userId: "123", requestId: "789" },
+        "test message"
+      );
+    });
+
+    it("should maintain separate contexts between parent and child", () => {
+      // Arrange
+      const logger = new Logger(defaultConfig);
+      const mockChildLogger = {
+        trace: jest.fn(),
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+        fatal: jest.fn(),
+        fields: { name: "test-logger" },
+        _streams: [{ level: "fatal", type: "stdout" }],
+      };
+      logger["logger"].child = jest
+        .fn()
+        .mockImplementation(() => mockChildLogger);
+
+      // Act
+      const childLogger = logger.child({ component: "auth" });
+      logger.setContext("parent", "value");
+      childLogger.setContext("child", "value");
+
+      // Assert
+      expect(logger["context"]).toEqual({ parent: "value" });
+      expect(childLogger["context"]).toEqual({
+        component: "auth",
+        child: "value",
+      });
+    });
+
+    describe("context scenarios", () => {
+      it("should maintain child logger context across execution context", () => {
+        // Arrange
+        const logger = new Logger(defaultConfig);
+        const middlewareLogger = logger.child({ reqId: "123" });
+        const mockChildLogger = {
+          trace: jest.fn(),
+          debug: jest.fn(),
+          info: jest.fn(),
+          warn: jest.fn(),
+          error: jest.fn(),
+          fatal: jest.fn(),
+          fields: { name: "test-logger" },
+          _streams: [{ level: "fatal", type: "stdout" }],
+        };
+        middlewareLogger["logger"].child = jest
+          .fn()
+          .mockImplementation(() => mockChildLogger);
+
+        // Act
+        const contextLogger = middlewareLogger.child({ lid: "456" });
+        contextLogger.info("test message");
+
+        // Assert
+        expect(contextLogger["logger"].info).toHaveBeenCalledWith(
+          { reqId: "123", lid: "456" },
+          "test message"
+        );
+      });
+
+      it("should preserve child logger in execution context", () => {
+        // Arrange
+        const logger = new Logger(defaultConfig);
+        const middlewareLogger = logger.child({ reqId: "123" });
+        const mockChildLogger = {
+          trace: jest.fn(),
+          debug: jest.fn(),
+          info: jest.fn(),
+          warn: jest.fn(),
+          error: jest.fn(),
+          fatal: jest.fn(),
+          fields: { name: "test-logger" },
+          _streams: [{ level: "fatal", type: "stdout" }],
+        };
+        middlewareLogger["logger"].child = jest
+          .fn()
+          .mockImplementation(() => mockChildLogger);
+
+        // Act
+        const contextLogger = middlewareLogger.child({ lid: "456" });
+        const executionContext = new AsyncLocalStorage<LoggerContext>();
+        let contextLoggerInScope: Logger | undefined;
+
+        executionContext.run({ logger: contextLogger }, () => {
+          contextLoggerInScope = executionContext.getStore()?.logger;
+        });
+
+        // Assert
+        expect(contextLoggerInScope).toBe(contextLogger);
+        expect(contextLoggerInScope?.["logger"]).toBe(mockChildLogger);
+      });
     });
   });
 });

@@ -268,6 +268,42 @@ The logger uses two levels of configuration:
      - `defaultChannel`: Default Slack channel
      - `level`: Minimum level for Slack notifications
 
+## Child Loggers
+
+The logger supports creating child loggers that inherit context from their parent while allowing for additional bound fields. This is particularly useful for tracking request-specific information across different parts of your application.
+
+```typescript
+// Create a parent logger
+const logger = new Logger(config);
+
+// Create a child logger with request-specific fields
+const requestLogger = logger.child({ reqId: "123" });
+
+// The child logger inherits the parent's context
+logger.setContext("userId", "456");
+requestLogger.info("Processing request"); // Includes both reqId and userId
+
+// Child loggers can have their own context
+requestLogger.setContext("component", "auth");
+requestLogger.info("Authenticating user"); // Includes reqId, userId, and component
+
+// Child loggers maintain their context across async boundaries
+const executionContext = new AsyncLocalStorage<LoggerContext>();
+executionContext.run({ logger: requestLogger }, async () => {
+  // The logger maintains its context here
+  requestLogger.info("Inside async context");
+});
+```
+
+### Context Inheritance
+
+Child loggers inherit their parent's context and can override it with their own bound fields. The inheritance works as follows:
+
+1. Parent context is copied to the child
+2. Bound fields are merged with the parent's context
+3. Child-specific context can be added using `setContext`
+4. Context is maintained across async boundaries
+
 ## API Documentation
 
 ### Log Levels
