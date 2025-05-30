@@ -2,10 +2,11 @@ import { WebClient } from "@slack/web-api";
 import { isLevelEnabled } from "./isLevelEnabled";
 import {
   COLOR_FROM_LEVEL,
+  EMOJI_FROM_LEVEL,
   SlackLogger,
   SlackLoggerConfig,
 } from "./slackLogger";
-import { LogLevelEnum } from "./types";
+import { Context, LogLevel, LogLevelEnum } from "./types";
 
 // Mock WebClient
 jest.mock("@slack/web-api");
@@ -200,6 +201,43 @@ describe("SlackLogger", () => {
       const consoleSpy = jest.spyOn(console, "error").mockImplementation();
       await expect(
         slackLogger.send(level, message, context)
+      ).resolves.toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Error sending slack message:",
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("sendDirect", () => {
+    it("should send message to Slack without any formatting", async () => {
+      // Arrange
+      const channel = "#test-channel";
+      const message = "Test message";
+
+      // Act
+      await slackLogger.sendDirect(channel, message);
+
+      // Assert
+      expect(mockPostMessage).toHaveBeenCalledWith({
+        text: message,
+        channel,
+        username: "AtlasLogger",
+        icon_emoji: ":bell:",
+      });
+    });
+
+    it("should handle errors gracefully", async () => {
+      // Arrange
+      mockPostMessage.mockRejectedValue(new Error("Slack API Error"));
+      const channel = "#test-channel";
+      const message = "Test message";
+
+      // Act & Assert
+      const consoleSpy = jest.spyOn(console, "error").mockImplementation();
+      await expect(
+        slackLogger.sendDirect(channel, message)
       ).resolves.toBeUndefined();
       expect(consoleSpy).toHaveBeenCalledWith(
         "Error sending slack message:",

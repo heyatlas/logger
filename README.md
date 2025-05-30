@@ -212,11 +212,22 @@ const logger = new Logger({
   },
 });
 
+// Regular logging with level validation
 logger.error("Something went wrong", {
   slack: { channel: "#alerts" },
   error: new Error("Details here"),
 });
+
+// Direct Slack messaging without level validation
+// Useful for sending notifications that don't need to go through the logger
+logger.slackLogger?.sendDirect("#notifications", "Important notification");
 ```
+
+The `sendDirect` method allows you to send messages directly to Slack without any formatting or level validation. This is useful for:
+
+- Sending simple notifications that don't need to be logged
+- Reusing the SlackLogger instance in other parts of your application
+- Sending plain text messages to specific channels
 
 ### Environment-based Configuration
 

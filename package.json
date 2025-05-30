@@ -1,6 +1,6 @@
 {
   "name": "@heyatlas/logger",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "A structured logger with Slack integration and Lambda support",
   "keywords": [
     "logger",

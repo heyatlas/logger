@@ -74,6 +74,20 @@ export class SlackLogger {
     }
   }
 
+  public async sendDirect(channel: string, message: string): Promise<void> {
+    const slackMessage = {
+      text: message,
+      channel,
+      username: "AtlasLogger",
+      icon_emoji: ":bell:",
+    };
+    try {
+      await this.client.chat.postMessage(slackMessage);
+    } catch (error) {
+      console.error("Error sending slack message:", error);
+    }
+  }
+
   public getConfig(): SlackLoggerConfig {
     return this.config;
   }
