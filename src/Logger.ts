@@ -46,6 +46,9 @@ export class Logger {
   private logger: bunyan;
   private context: Record<string, unknown> = {};
   public slackLogger?: SlackLogger;
+  private loggerName: string;
+  private streamConfigs: StreamConfig[];
+  private slackApiToken?: string;
 
   constructor(config: LogConfig) {
     const environment = process.env.NODE_ENV || "local";
@@ -60,6 +63,11 @@ export class Logger {
 
     // Merge default environment config with user-provided config
     const finalEnvConfig = merge({}, defaultEnvConfig, envConfig);
+
+    // Store configuration for child loggers
+    this.loggerName = config.name;
+    this.streamConfigs = finalEnvConfig.streams;
+    this.slackApiToken = config.slackApiToken;
 
     this.logger = this.createLogger({
       name: config.name,
@@ -157,20 +165,15 @@ export class Logger {
 
   public child(boundFields: Context): Logger {
     const childLogger = new Logger({
-      name: this.logger.fields.name,
-      slackApiToken: this.slackLogger?.getConfig().apiToken,
+      name: this.loggerName,
+      slackApiToken: this.slackApiToken,
       [process.env.NODE_ENV || "local"]: {
-        streams: (this.logger as any)._streams.map(
-          (stream: { level: number; type: string; path?: string }) => ({
-            level: stream.level,
-            type: stream.type,
-            path: stream.path,
-          })
-        ),
+        streams: this.streamConfigs,
       },
     });
     childLogger.logger = this.logger.child(boundFields);
     childLogger.context = { ...this.context, ...boundFields };
+    childLogger.slackLogger = this.slackLogger;
     return childLogger;
   }
 }
