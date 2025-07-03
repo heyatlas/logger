@@ -45,13 +45,13 @@ logger.info("Hello world", { userId: "123" });
 
 ```typescript
 import { AsyncLocalStorage } from "async_hooks";
-import { createLogger, withLoggerLambda } from "@heyatlas/logger";
+import { Logger, withLoggerLambda } from "@heyatlas/logger";
 
 // Create execution context
 const executionContext = new AsyncLocalStorage();
 
-// Create logger factory
-const { logger, getLogger } = createLogger(executionContext, {
+// Create logger configuration
+const loggerConfig = {
   name: "my-lambda-service",
   slackApiToken: process.env.SLACK_TOKEN,
   production: {
@@ -61,28 +61,42 @@ const { logger, getLogger } = createLogger(executionContext, {
       level: "error",
     },
   },
-});
+};
 
-// Export getLogger for use in other modules
-export { getLogger };
+// Create logger instance
+const logger = new Logger(loggerConfig);
 
 // Lambda handler
 export const handler = withLoggerLambda(
   executionContext,
+  logger, // Pass the logger instance
   async (event, context) => {
-    const logger = getLogger();
+    // The logger is automatically available in the execution context
+    const contextLogger = executionContext.getStore()?.logger;
 
-    logger.info("Processing event", { event });
+    contextLogger?.info("Processing event", { event });
 
     try {
       // Your handler logic here
       const result = await processEvent(event);
-      logger.info("Event processed successfully", { result });
+      contextLogger?.info("Event processed successfully", { result });
       return result;
     } catch (error) {
-      logger.error("Failed to process event", { error });
+      contextLogger?.error("Failed to process event", { error });
       throw error;
     }
+  }
+);
+
+// Alternative: Pass config directly to withLoggerLambda
+export const alternativeHandler = withLoggerLambda(
+  executionContext,
+  loggerConfig, // Pass the config directly
+  async (event, context) => {
+    // Logger is created internally and available in context
+    const contextLogger = executionContext.getStore()?.logger;
+    contextLogger?.info("Processing with config-based logger");
+    // ... handler logic
   }
 );
 ```

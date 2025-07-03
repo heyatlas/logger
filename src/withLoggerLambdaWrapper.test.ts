@@ -2,29 +2,36 @@ import { AsyncLocalStorage } from "async_hooks";
 import { Logger } from "./Logger";
 import { LoggerContext } from "./loggerFactory";
 import { withLoggerLambda } from "./withLoggerLambdaWrapper";
-import { createLogger } from "./loggerFactory";
+import { LogConfig } from "./types";
 
 describe("withLoggerLambda", () => {
   let executionContext: AsyncLocalStorage<LoggerContext>;
   let mockHandler: jest.Mock;
   let wrappedHandler: ReturnType<typeof withLoggerLambda>;
   let logger: Logger;
+  let logConfig: LogConfig;
 
   beforeEach(() => {
     jest.clearAllMocks();
     executionContext = new AsyncLocalStorage();
     mockHandler = jest.fn().mockResolvedValue({ success: true });
 
-    // Create logger factory and set up context
-    const loggerFactory = createLogger(executionContext, {
+    // Create test config
+    logConfig = {
       name: "test-service",
-    });
-    logger = loggerFactory.logger;
-    // Mock setContext method
-    logger.setContext = jest.fn();
+      test: {
+        streams: [{ level: "info", type: "stdout" }],
+      },
+    };
 
-    // Create wrapped handler after context is set up
-    wrappedHandler = withLoggerLambda(executionContext, mockHandler);
+    // Create logger
+    logger = new Logger(logConfig);
+
+    // Mock setContext method
+    logger.setContext = jest.fn().mockReturnValue(logger);
+
+    // Create wrapped handler with logger
+    wrappedHandler = withLoggerLambda(executionContext, logger, mockHandler);
   });
 
   it("should set AWS request ID and function name in logger context", async () => {
@@ -35,15 +42,15 @@ describe("withLoggerLambda", () => {
       functionName: "test-function",
     };
 
-    // Act & Assert
-    await executionContext.run({ logger }, async () => {
-      await wrappedHandler(event, context);
-      expect(logger.setContext).toHaveBeenCalledWith("awsRequestId", "123-456");
-      expect(logger.setContext).toHaveBeenCalledWith(
-        "functionName",
-        "test-function"
-      );
-    });
+    // Act
+    await wrappedHandler(event, context);
+
+    // Assert
+    expect(logger.setContext).toHaveBeenCalledWith("awsRequestId", "123-456");
+    expect(logger.setContext).toHaveBeenCalledWith(
+      "functionName",
+      "test-function"
+    );
   });
 
   it("should handle SQS events and set message IDs in context", async () => {
@@ -60,14 +67,14 @@ describe("withLoggerLambda", () => {
       functionName: "test-function",
     };
 
-    // Act & Assert
-    await executionContext.run({ logger }, async () => {
-      await wrappedHandler(event, context);
-      expect(logger.setContext).toHaveBeenCalledWith("sqsMessageIds", [
-        "msg1",
-        "msg2",
-      ]);
-    });
+    // Act
+    await wrappedHandler(event, context);
+
+    // Assert
+    expect(logger.setContext).toHaveBeenCalledWith("sqsMessageIds", [
+      "msg1",
+      "msg2",
+    ]);
   });
 
   it("should not set SQS message IDs for non-SQS events", async () => {
@@ -80,14 +87,14 @@ describe("withLoggerLambda", () => {
       functionName: "test-function",
     };
 
-    // Act & Assert
-    await executionContext.run({ logger }, async () => {
-      await wrappedHandler(event, context);
-      expect(logger.setContext).not.toHaveBeenCalledWith(
-        "sqsMessageIds",
-        expect.any(Array)
-      );
-    });
+    // Act
+    await wrappedHandler(event, context);
+
+    // Assert
+    expect(logger.setContext).not.toHaveBeenCalledWith(
+      "sqsMessageIds",
+      expect.any(Array)
+    );
   });
 
   it("should call the handler with original event and context", async () => {
@@ -98,11 +105,11 @@ describe("withLoggerLambda", () => {
       functionName: "test-function",
     };
 
-    // Act & Assert
-    await executionContext.run({ logger }, async () => {
-      await wrappedHandler(event, context);
-      expect(mockHandler).toHaveBeenCalledWith(event, context);
-    });
+    // Act
+    await wrappedHandler(event, context);
+
+    // Assert
+    expect(mockHandler).toHaveBeenCalledWith(event, context);
   });
 
   it("should return handler result", async () => {
@@ -110,10 +117,10 @@ describe("withLoggerLambda", () => {
     const expectedResult = { success: true };
     mockHandler.mockResolvedValueOnce(expectedResult);
 
-    // Act & Assert
-    const result = await executionContext.run({ logger }, async () => {
-      return wrappedHandler({}, {});
-    });
+    // Act
+    const result = await wrappedHandler({}, {});
+
+    // Assert
     expect(result).toEqual(expectedResult);
   });
 
@@ -124,22 +131,58 @@ describe("withLoggerLambda", () => {
     const exitSpy = jest.spyOn(executionContext, "exit");
 
     // Act & Assert
-    await expect(
-      executionContext.run({ logger }, async () => {
-        await wrappedHandler({}, {});
-      })
-    ).rejects.toThrow(error);
+    await expect(wrappedHandler({}, {})).rejects.toThrow(error);
     expect(exitSpy).toHaveBeenCalled();
   });
 
-  it("should throw error if logger is not found in context", async () => {
+  it("should create logger from config when config is provided", async () => {
     // Arrange
-    const emptyContext = new AsyncLocalStorage<LoggerContext>();
-    const handler = withLoggerLambda(emptyContext, mockHandler);
-
-    // Act & Assert
-    await expect(handler({}, {})).rejects.toThrow(
-      "Logger not found in context"
+    const handlerWithConfig = withLoggerLambda(
+      executionContext,
+      logConfig,
+      mockHandler
     );
+    const event = {};
+    const context = {
+      awsRequestId: "789-012",
+      functionName: "config-function",
+    };
+
+    // Act
+    await handlerWithConfig(event, context);
+
+    // Assert
+    expect(mockHandler).toHaveBeenCalledWith(event, context);
+  });
+
+  it("should work with existing logger instance", async () => {
+    // Arrange
+    const existingLogger = new Logger(logConfig);
+    existingLogger.setContext = jest.fn().mockReturnValue(existingLogger);
+
+    const handlerWithLogger = withLoggerLambda(
+      executionContext,
+      existingLogger,
+      mockHandler
+    );
+    const event = {};
+    const context = {
+      awsRequestId: "345-678",
+      functionName: "logger-function",
+    };
+
+    // Act
+    await handlerWithLogger(event, context);
+
+    // Assert
+    expect(existingLogger.setContext).toHaveBeenCalledWith(
+      "awsRequestId",
+      "345-678"
+    );
+    expect(existingLogger.setContext).toHaveBeenCalledWith(
+      "functionName",
+      "logger-function"
+    );
+    expect(mockHandler).toHaveBeenCalledWith(event, context);
   });
 });

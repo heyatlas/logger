@@ -1,20 +1,22 @@
 import { AsyncLocalStorage } from "async_hooks";
+import { Logger } from "./Logger";
 import { LoggerContext } from "./loggerFactory";
+import { LogConfig } from "./types";
 
 // Wrapper for Lambda handlers
 export function withLoggerLambda<T>(
   executionContext: AsyncLocalStorage<LoggerContext>,
+  loggerOrConfig: Logger | LogConfig,
   handler: (event: any, context: any) => Promise<T>
 ): (event: any, context: any) => Promise<T> {
   return async (event: any, context: any) => {
-    const store = executionContext.getStore();
-    if (!store?.logger) {
-      throw new Error(
-        "Logger not found in context. Make sure you are running within a context scope."
-      );
-    }
-    const logger = store.logger;
+    // Create logger instance if config was provided
+    const logger =
+      loggerOrConfig instanceof Logger
+        ? loggerOrConfig
+        : new Logger(loggerOrConfig);
 
+    // Set Lambda-specific context
     logger.setContext("awsRequestId", context.awsRequestId);
     logger.setContext("functionName", context.functionName);
 
@@ -31,6 +33,7 @@ export function withLoggerLambda<T>(
     }
 
     try {
+      // Run the handler within the logger context
       return await executionContext.run({ logger }, async () => {
         return await handler(event, context);
       });

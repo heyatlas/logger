@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] - 2025-03-07
+
+### Fixed
+
+- Fixed critical bug in `withLoggerLambda` where it expected a logger to already exist in the execution context
+- The function now properly accepts a Logger instance or LogConfig as a parameter and creates its own context
+
+### Changed
+
+- **Breaking Change**: `withLoggerLambda` now requires a Logger instance or LogConfig as the second parameter
+- Updated function signature from `withLoggerLambda(context, handler)` to `withLoggerLambda(context, loggerOrConfig, handler)`
+
 ## [1.4.3] - 2025-01-07
 
 ### Fixed
