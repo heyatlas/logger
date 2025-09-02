@@ -87,12 +87,13 @@ export class Logger {
     streams: StreamConfig[];
   }): bunyan {
     const streams: bunyan.Stream[] = config.streams.map((streamConfig) => {
+      const env = process.env.NODE_ENV || 'local'
       switch (streamConfig.type) {
         case "stdout":
           return {
             level: streamConfig.level,
             stream:
-              process.env.NODE_ENV === "test" ? prettyStream : process.stdout,
+              ['local', 'test'].includes(env) ? prettyStream : process.stdout,
           };
         case "file":
           if (!streamConfig.path) {
